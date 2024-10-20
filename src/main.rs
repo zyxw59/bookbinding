@@ -16,7 +16,7 @@ struct Args {
     end_pages: bool,
 }
 
-#[derive(Debug, clap::Args)]
+#[derive(Clone, Copy, Debug, clap::Args)]
 struct SignatureParams {
     /// Preferred number of sheets per signature
     #[arg(short, long, default_value_t = 6)]
@@ -37,16 +37,13 @@ fn main() -> color_eyre::Result<()> {
     }
     let num_pages = document.page_iter().size_hint().0;
     // round pages up
-    add_pages(
-        &mut document,
-        num_pages.next_multiple_of(4) - num_pages,
-        false,
-    )?;
+    let blanks_needed = num_pages.next_multiple_of(4) - num_pages;
+    add_pages(&mut document, blanks_needed, false)?;
     let pages = document
         .page_iter()
         .map(|id| document.get_object(id).map(|obj| (id, obj.clone())))
         .collect::<Result<Vec<_>, _>>()?;
-    arrange_pages_with(pages.len(), args.signature_params, |src, dest| {
+    let metadata = arrange_pages_with(pages.len(), args.signature_params, |src, dest| {
         let mut src_obj = pages[src].1.clone();
         let dest_id = pages[dest].0;
         if let Ok(src_dict) = src_obj.as_dict_mut() {
@@ -59,6 +56,19 @@ fn main() -> color_eyre::Result<()> {
         document.set_object(dest_id, src_obj);
     });
     document.save(args.output)?;
+
+    let mut num_pages = num_pages;
+    let mut blanks_needed = blanks_needed;
+    if args.end_pages {
+        num_pages -= 2;
+        blanks_needed += 2;
+    }
+    println!("Number of non-blank pages: {num_pages}");
+    println!("Number of blank pages:     {blanks_needed}");
+    println!("Number of sheets:          {}", metadata.num_sheets);
+    println!("Number of signatures:      {}", metadata.num_signatures);
+    println!("Sheets per signature:      {}", args.signature_params.signature_size);
+    println!("Sheets in last signature:  {}", metadata.remainder_sheets);
     Ok(())
 }
 
@@ -127,7 +137,7 @@ fn arrange_pages_with(
     num_pages: usize,
     params: SignatureParams,
     mut with: impl FnMut(usize, usize),
-) {
+) -> Metadata {
     let pages_per_signature = params.signature_size * 4;
     let mut num_signatures = num_pages / pages_per_signature;
     let mut remainder = num_pages - num_signatures * pages_per_signature;
@@ -145,6 +155,21 @@ fn arrange_pages_with(
         remainder.div_ceil(4),
         &mut with,
     );
+    Metadata {
+        num_sheets: num_pages.div_ceil(4),
+        num_signatures: if remainder == 0 {
+            num_signatures
+        } else {
+            num_signatures + 1
+        },
+        remainder_sheets: remainder.div_ceil(4),
+    }
+}
+
+struct Metadata {
+    num_sheets: usize,
+    num_signatures: usize,
+    remainder_sheets: usize,
 }
 
 /// Arrange the pages for a given signature using the given parameters, using the provided function
@@ -152,7 +177,6 @@ fn arrange_pages_with(
 /// The first argument to the function is the page index in the input document, and the second
 /// argument is the page index in the output document.
 fn signature_with(start: usize, num_sheets: usize, mut with: impl FnMut(usize, usize)) {
-    println!("{}", start + 1);
     let num_pages = num_sheets * 4;
     let end = start + num_pages;
     for i in 0..num_sheets {
