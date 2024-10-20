@@ -37,14 +37,25 @@ fn main() -> color_eyre::Result<()> {
     }
     let num_pages = document.page_iter().size_hint().0;
     // round pages up
-    add_pages(&mut document, num_pages.next_multiple_of(4) - num_pages, false)?;
+    add_pages(
+        &mut document,
+        num_pages.next_multiple_of(4) - num_pages,
+        false,
+    )?;
     let pages = document
         .page_iter()
         .map(|id| document.get_object(id).map(|obj| (id, obj.clone())))
         .collect::<Result<Vec<_>, _>>()?;
     arrange_pages_with(pages.len(), args.signature_params, |src, dest| {
-        let src_obj = pages[src].1.clone();
+        let mut src_obj = pages[src].1.clone();
         let dest_id = pages[dest].0;
+        if let Ok(src_dict) = src_obj.as_dict_mut() {
+            if let Ok(dest_parent) = pages[dest].1.as_dict().and_then(|dict| dict.get(b"Parent")) {
+                src_dict.set(b"Parent", dest_parent.clone());
+            } else {
+                src_dict.remove(b"Parent");
+            }
+        }
         document.set_object(dest_id, src_obj);
     });
     document.save(args.output)?;
