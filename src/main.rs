@@ -36,7 +36,8 @@ fn main() -> color_eyre::Result<()> {
         add_pages(&mut document, 1, false)?;
     }
     let num_pages = document.page_iter().size_hint().0;
-    add_pages(&mut document, 4 - (num_pages % 4), false)?;
+    // round pages up
+    add_pages(&mut document, num_pages.next_multiple_of(4) - num_pages, false)?;
     let pages = document
         .page_iter()
         .map(|id| document.get_object(id).map(|obj| (id, obj.clone())))
