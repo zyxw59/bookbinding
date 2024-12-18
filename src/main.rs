@@ -143,7 +143,7 @@ fn arrange_pages_with(
     let mut remainder = num_pages - num_signatures * pages_per_signature;
     // if the remainder would be too short, make an overlong signature instead of a short
     // signature.
-    if remainder > 0 && remainder <= params.minimum_remainder_size * 4 && num_signatures >= 1 {
+    if remainder > 0 && remainder < params.minimum_remainder_size * 4 && num_signatures >= 1 {
         num_signatures -= 1;
         remainder += pages_per_signature;
     }
