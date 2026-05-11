@@ -9,7 +9,4 @@ test-case = "3.3.1"
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
 color-eyre = "0.6.3"
-lopdf = "0.34.0"
-
-[patch.crates-io]
-lopdf = { git = "https://github.com/J-F-Liu/lopdf" }
+lopdf = "0.40.0"
